@@ -2,7 +2,7 @@
 
 A single-file, browser-based tool for estimating GPU memory requirements when deploying large language models (LLMs) for inference. Input your model architecture, precision format, concurrency target, and context window — get a step-by-step memory breakdown and a recommendation matrix across a library of GPU options.
 
-**<a href="https://ahsansubzwari1.github.io/llm-gpu-sizing-calculator" target="_blank">Launch the calculator →</a>**
+**<a href="https://ahsansubzwari1.github.io/llm-gpu-sizing-calculator/index.html" target="_blank">Launch the calculator →</a>**
 
 
 ---
