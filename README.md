@@ -3,7 +3,7 @@
 A single-file, browser-based tool for estimating GPU memory requirements when deploying large language models (LLMs) for inference. Input your model architecture, precision format, concurrency target, and context window — get a step-by-step memory breakdown and a recommendation matrix across a library of GPU options.
 
 **<a href="https://ahsansubzwari1.github.io/llm-gpu-sizing-calculator" target="_blank">Launch the calculator →</a>**
-*(Update this link after enabling GitHub Pages — see setup below)*
+
 
 ---
 
@@ -93,33 +93,6 @@ The tool includes the following GPUs:
 | Mistral 7B v0.3 | 7B | Dense | 8 KV heads (GQA) |
 
 For models not in the preset list, select **custom / manual entry** and fill in the architecture fields directly.
-
----
-
-## Setup and hosting
-
-### Option A — Open locally (no setup required)
-
-1. Clone or download this repository
-2. Open `index.html` in any modern browser
-3. No server, no install, no dependencies
-
-```bash
-git clone https://github.com/your-org/llm-gpu-sizing-calculator.git
-cd llm-gpu-sizing-calculator
-open index.html   # macOS
-# or double-click index.html in Windows Explorer / Linux file manager
-```
-
-### Option B — Host on GitHub Pages (recommended)
-
-1. Push this repository to GitHub
-2. Go to **Settings → Pages**
-3. Under **Source**, select **Deploy from a branch**
-4. Set branch to `main` and folder to `/ (root)`
-5. Click **Save**
-6. Your tool will be live at `https://your-org.github.io/llm-gpu-sizing-calculator` within a few minutes
-7. Update the link at the top of this README
 
 ---
 
