@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LLM-GPU Sizing Calculator</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #ffffff;
+    --bg-secondary: #f6f8fa;
+    --bg-tertiary: #f0f2f5;
+    --border: #d0d7de;
+    --border-light: #e8eaed;
+    --text: #1a1a1a;
+    --text-muted: #57606a;
+    --text-hint: #8c959f;
+    --blue: #0969da;
+    --blue-bg: #ddf4ff;
+    --blue-text: #0550ae;
+    --green: #1a7f37;
+    --green-bg: #dafbe1;
+    --green-text: #116329;
+    --amber: #bf8700;
+    --amber-bg: #fff8c5;
+    --amber-text: #7d4e00;
+    --red: #cf222e;
+    --red-bg: #ffebe9;
+    --red-text: #82071e;
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1117;
+      --bg-secondary: #161b22;
+      --bg-tertiary: #1c2128;
+      --border: #30363d;
+      --border-light: #21262d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --text-hint: #6e7681;
+      --blue: #58a6ff;
+      --blue-bg: #0c2d6b;
+      --blue-text: #79c0ff;
+      --green: #3fb950;
+      --green-bg: #0f2d18;
+      --green-text: #56d364;
+      --amber: #d29922;
+      --amber-bg: #2d1f06;
+      --amber-text: #e3b341;
+      --red: #f85149;
+      --red-bg: #2c0b0e;
+      --red-text: #ff7b72;
+    }
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    background: var(--bg-tertiary);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  header {
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .header-left { display: flex; align-items: center; gap: 12px; }
+
+  .header-icon {
+    width: 32px; height: 32px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .header-icon svg { width: 18px; height: 18px; }
+
+  .header-title { font-size: 16px; font-weight: 600; color: var(--text); }
+  .header-sub { font-size: 12px; color: var(--text-muted); }
+
+  .header-badge {
+    font-size: 11px; padding: 3px 10px;
+    border-radius: 20px;
+    background: var(--blue-bg); color: var(--blue-text);
+    font-weight: 500;
+  }
+
+  main { max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
+
+  .layout { display: grid; grid-template-columns: 320px 1fr; gap: 16px; align-items: start; }
+
+  @media (max-width: 768px) { .layout { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    margin-bottom: 14px;
+  }
+
+  .card:last-child { margin-bottom: 0; }
+
+  .card-head {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    padding: 9px 16px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .card-body { padding: 16px; }
+
+  .fg { margin-bottom: 14px; }
+  .fg:last-child { margin-bottom: 0; }
+
+  .fl {
+    font-size: 11px; font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 5px;
+    display: flex; align-items: center; gap: 5px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+
+  select, input[type="number"] {
+    width: 100%;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 7px 10px;
+    font-size: 13px;
+    color: var(--text);
+    font-family: inherit;
+    transition: border-color 0.15s;
+  }
+
+  select:focus, input[type="number"]:focus {
+    outline: none;
+    border-color: var(--blue);
+    box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.1);
+  }
+
+  .frow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--blue);
+    cursor: pointer;
+    transition: transform 0.1s;
+  }
+
+  input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+  input[type="range"]::-moz-range-thumb {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--blue);
+    cursor: pointer;
+    border: none;
+  }
+
+  .sl-row { display: flex; align-items: center; gap: 10px; }
+  .sl-val {
+    font-size: 13px; font-weight: 600;
+    color: var(--text);
+    min-width: 44px; text-align: right;
+  }
+
+  .divl { border: none; border-top: 1px solid var(--border-light); margin: 14px 0; }
+
+  .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+
+  .mc {
+    background: var(--bg-secondary);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    border: 1px solid var(--border-light);
+  }
+
+  .mc-label {
+    font-size: 10px; color: var(--text-muted);
+    font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.05em; margin-bottom: 5px;
+  }
+
+  .mc-val { font-size: 24px; font-weight: 600; color: var(--text); line-height: 1.2; }
+  .mc-sub { font-size: 11px; color: var(--text-hint); margin-top: 3px; }
+
+  .brow {
+    display: flex; justify-content: space-between;
+    align-items: center; padding: 8px 0;
+    border-bottom: 1px solid var(--border-light);
+    font-size: 13px;
+  }
+
+  .brow:last-child { border-bottom: none; font-weight: 600; }
+  .blabel { color: var(--text-muted); }
+  .bval { color: var(--text); font-weight: 500; }
+
+  .hbar-wrap { margin: 14px 0 0; }
+
+  .hbar-top {
+    display: flex; justify-content: space-between;
+    font-size: 11px; color: var(--text-muted); margin-bottom: 6px;
+  }
+
+  .hbar-bg {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: 4px; height: 10px;
+    overflow: hidden;
+  }
+
+  .hbar-fill { height: 10px; border-radius: 4px; transition: width 0.4s, background 0.4s; width: 0%; }
+  .hbar-note { font-size: 11px; color: var(--text-hint); margin-top: 6px; }
+
+  .math-box {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 11.5px;
+    color: var(--text-muted);
+    line-height: 1.9;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .math-box strong { color: var(--text); }
+
+  .matrix-scroll { overflow-x: auto; }
+
+  table {
+    width: 100%; border-collapse: collapse;
+    font-size: 12.5px;
+    min-width: 600px;
+  }
+
+  th {
+    background: var(--bg-secondary);
+    padding: 9px 12px;
+    text-align: left;
+    font-size: 10px; font-weight: 600;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase; letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border-light);
+    color: var(--text);
+    white-space: nowrap;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  tbody tr { cursor: pointer; transition: background 0.1s; }
+  tbody tr:hover { background: var(--bg-secondary); }
+  tbody tr.selected { background: var(--blue-bg) !important; }
+
+  .pill {
+    display: inline-block;
+    padding: 2px 9px; border-radius: 20px;
+    font-size: 11px; font-weight: 500;
+  }
+
+  .pill-good { background: var(--green-bg); color: var(--green-text); }
+  .pill-warn { background: var(--amber-bg); color: var(--amber-text); }
+  .pill-bad  { background: var(--red-bg);   color: var(--red-text);   }
+
+  .tt-wrap { position: relative; display: inline-flex; align-items: center; }
+
+  .tt-icon {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 9px; font-weight: 600;
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: default; flex-shrink: 0;
+    font-style: normal; line-height: 1;
+    user-select: none;
+  }
+
+  .tt-box {
+    display: none;
+    position: absolute;
+    left: 20px; top: -6px;
+    z-index: 9999;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.55;
+    width: 240px;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    pointer-events: none;
+  }
+
+  .tt-wrap:hover .tt-box { display: block; }
+
+  .notice {
+    background: var(--blue-bg);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    font-size: 12px;
+    color: var(--blue-text);
+    margin-bottom: 14px;
+    line-height: 1.55;
+  }
+
+  .hint-text {
+    font-size: 11px; color: var(--text-hint);
+    padding: 8px 16px 10px;
+    border-top: 1px solid var(--border-light);
+  }
+
+  footer {
+    text-align: center;
+    padding: 32px 16px 24px;
+    font-size: 12px;
+    color: var(--text-hint);
+  }
+
+  footer a { color: var(--blue); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="header-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-muted);">
+        <rect x="2" y="3" width="20" height="14" rx="2"/>
+        <path d="M8 21h8M12 17v4"/>
+        <path d="M7 8h2M11 8h6M7 11h4M13 11h4"/>
+      </svg>
+    </div>
+    <div>
+      <div class="header-title">LLM-GPU Sizing Calculator</div>
+      <div class="header-sub">Estimate VRAM requirements for LLM inference workloads</div>
+    </div>
+  </div>
+  <span class="header-badge">v1.0</span>
+</header>
+
+<main>
+  <div class="layout">
+
+    <div>
+      <div class="card">
+        <div class="card-head">Model configuration</div>
+        <div class="card-body">
+
+          <div class="fg">
+            <div class="fl">Model preset</div>
+            <select id="preset" onchange="applyPreset()">
+              <option value="custom">— custom / manual entry —</option>
+              <optgroup label="120B+ class">
+                <option value="nemotron120">Nemotron-3-Super-120B-A12B</option>
+                <option value="gptoss120">gpt-oss-120b (MoE)</option>
+                <option value="llama405">Llama 3.1 405B</option>
+              </optgroup>
+              <optgroup label="70B class">
+                <option value="llama370">Llama 3.3 70B Instruct</option>
+                <option value="qwen72">Qwen2.5-Coder-72B Instruct</option>
+                <option value="mixtral8x22">Mixtral 8×22B (MoE)</option>
+              </optgroup>
+              <optgroup label="32B class">
+                <option value="qwen32">Qwen2.5-32B Instruct</option>
+                <option value="llama32_90">Llama 3.2 90B Vision</option>
+              </optgroup>
+              <optgroup label="24B and below">
+                <option value="devstral24">Devstral-Small-2-24B</option>
+                <option value="mistral22">Mistral-Small-22B</option>
+                <option value="mixtral8x7b">Mixtral 8×7B (MoE)</option>
+                <option value="llama8">Llama 3.1 8B Instruct</option>
+                <option value="qwen7">Qwen2.5-7B Instruct</option>
+                <option value="mistral7">Mistral 7B v0.3</option>
+              </optgroup>
+            </select>
+          </div>
+
+          <div class="frow">
+            <div class="fg">
+              <div class="fl">
+                Layers
+                <span class="tt-wrap">
+                  <i class="tt-icon">i</i>
+                  <span class="tt-box">The number of transformer layers in the model. Each layer requires its own Key and Value vectors stored in memory. More layers = larger KV cache.</span>
+                </span>
+              </div>
+              <input type="number" id="layers" value="96" min="1" oninput="calc()">
+            </div>
+            <div class="fg">
+              <div class="fl">
+                KV heads
+                <span class="tt-wrap">
+                  <i class="tt-icon">i</i>
+                  <span class="tt-box">Number of Key/Value attention heads after Grouped Query Attention (GQA). GQA shares KV heads across multiple query heads, drastically reducing KV cache size. Most modern models use 8 KV heads.</span>
+                </span>
+              </div>
+              <input type="number" id="kvheads" value="8" min="1" oninput="calc()">
+            </div>
+          </div>
+
+          <div class="frow">
+            <div class="fg">
+              <div class="fl">
+                Head dim
+                <span class="tt-wrap">
+                  <i class="tt-icon">i</i>
+                  <span class="tt-box">The dimensionality of each attention head's key/value vectors. Common values are 64 and 128. Larger values increase memory per token proportionally.</span>
+                </span>
+              </div>
+              <input type="number" id="headdim" value="128" min="1" oninput="calc()">
+            </div>
+            <div class="fg">
+              <div class="fl">
+                Params (B)
+                <span class="tt-wrap">
+                  <i class="tt-icon">i</i>
+                  <span class="tt-box">Total model parameter count in billions. Used to estimate model weight memory: params × bytes per precision. For MoE models, use the total parameter count — all weights must reside in VRAM even if only a subset are active per token.</span>
+                </span>
+              </div>
+              <input type="number" id="params" value="120" min="0.1" step="0.1" oninput="calc()">
+            </div>
+          </div>
+
+          <hr class="divl">
+
+          <div class="fg">
+            <div class="fl">
+              Weight precision
+              <span class="tt-wrap">
+                <i class="tt-icon">i</i>
+                <span class="tt-box">Numerical format used to store model weights in GPU memory. Lower precision reduces memory but may affect output quality. BF16 = 2 bytes/param (full quality). FP8 = 1 byte/param (minimal quality loss). INT4 = 0.5 bytes/param (noticeable quality trade-off).</span>
+              </span>
+            </div>
+            <select id="wprec" onchange="calc()">
+              <option value="2">BF16 / FP16 — 2 bytes per param</option>
+              <option value="1" selected>FP8 — 1 byte per param</option>
+              <option value="0.5">INT4 — 0.5 bytes per param</option>
+            </select>
+          </div>
+
+          <div class="fg">
+            <div class="fl">
+              KV cache precision
+              <span class="tt-wrap">
+                <i class="tt-icon">i</i>
+                <span class="tt-box">Numerical format used to store the KV cache during inference. Modern serving frameworks like vLLM can quantize the KV cache independently from model weights, saving significant memory with minimal quality impact.</span>
+              </span>
+            </div>
+            <select id="kprec" onchange="calc()">
+              <option value="2">FP16 — 2 bytes per element</option>
+              <option value="1" selected>FP8 — 1 byte per element</option>
+              <option value="0.5">INT8 quantized — 0.5 bytes</option>
+            </select>
+          </div>
+
+          <hr class="divl">
+
+          <div class="fg">
+            <div class="fl">
+              Concurrent users
+              <span class="tt-wrap">
+                <i class="tt-icon">i</i>
+                <span class="tt-box">Number of simultaneous inference sessions the GPU must support. Each active session requires its own KV cache allocation in VRAM. Higher concurrency multiplies KV cache memory linearly — this is often the dominant variable for large context workloads.</span>
+              </span>
+            </div>
+            <div class="sl-row">
+              <input type="range" id="users" min="1" max="50" value="5" step="1" oninput="syncSlider('users','users-out',v=>v)">
+              <span class="sl-val" id="users-out">5</span>
+            </div>
+          </div>
+
+          <div class="fg">
+            <div class="fl">
+              Context window (tokens)
+              <span class="tt-wrap">
+                <i class="tt-icon">i</i>
+                <span class="tt-box">Maximum number of tokens (roughly 0.75 words each) in a single session's context. The KV cache must store representations for every token in the active context. 128K tokens ≈ ~96,000 words, or a large codebase. Longer context = dramatically more memory per session.</span>
+              </span>
+            </div>
+            <div class="sl-row">
+              <input type="range" id="ctx" min="4096" max="524288" value="131072" step="4096" oninput="syncSlider('ctx','ctx-out',v=>v>=1024?Math.round(v/1024)+'K':v)">
+              <span class="sl-val" id="ctx-out">128K</span>
+            </div>
+          </div>
+
+          <div class="fg">
+            <div class="fl">
+              Avg context utilization
+              <span class="tt-wrap">
+                <i class="tt-icon">i</i>
+                <span class="tt-box">The average fraction of the maximum context window actually occupied at any moment across all sessions. Sessions build context gradually — early turns are short. 60% is a realistic default for agentic coding workloads. RAG workloads are typically lower (30–50%) since sessions are short-lived.</span>
+              </span>
+            </div>
+            <div class="sl-row">
+              <input type="range" id="util" min="10" max="100" value="60" step="5" oninput="syncSlider('util','util-out',v=>v+'%')">
+              <span class="sl-val" id="util-out">60%</span>
+            </div>
+          </div>
+
+          <div class="fg">
+            <div class="fl">
+              Framework overhead (GB)
+              <span class="tt-wrap">
+                <i class="tt-icon">i</i>
+                <span class="tt-box">VRAM reserved by the serving framework (e.g., vLLM, TensorRT-LLM) for CUDA kernels, activation buffers, attention computation workspace, and runtime state. Typically 10–20 GB depending on framework and batch size. Default of 14 GB is appropriate for vLLM with moderate batch sizes.</span>
+              </span>
+            </div>
+            <input type="number" id="overhead" value="14" min="0" oninput="calc()">
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div>
+
+      <div class="card">
+        <div class="card-head">Memory breakdown</div>
+        <div class="card-body">
+          <div class="metric-grid">
+            <div class="mc">
+              <div class="mc-label">Avg VRAM required</div>
+              <div class="mc-val" id="out-avg">—</div>
+              <div class="mc-sub">at avg utilization</div>
+            </div>
+            <div class="mc">
+              <div class="mc-label">Worst-case VRAM</div>
+              <div class="mc-val" id="out-wc">—</div>
+              <div class="mc-sub">all users at full context</div>
+            </div>
+          </div>
+          <div class="brow"><span class="blabel">Model weights</span><span class="bval" id="b-weights">—</span></div>
+          <div class="brow"><span class="blabel">KV cache (avg utilization)</span><span class="bval" id="b-kv">—</span></div>
+          <div class="brow"><span class="blabel">KV cache (worst case)</span><span class="bval" id="b-kv-wc">—</span></div>
+          <div class="brow"><span class="blabel">Serving framework overhead</span><span class="bval" id="b-oh">—</span></div>
+          <div class="brow"><span class="blabel">Total (avg)</span><span class="bval" id="b-total">—</span></div>
+
+          <div class="hbar-wrap">
+            <div class="hbar-top">
+              <span id="hbar-label" style="font-weight:500;">Click a GPU row below to see headroom</span>
+              <span id="hbar-pct"></span>
+            </div>
+            <div class="hbar-bg"><div class="hbar-fill" id="hbar"></div></div>
+            <div class="hbar-note" id="hbar-note"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">KV cache math — step by step</div>
+        <div class="card-body">
+          <div class="math-box" id="math-box">Adjust inputs above to see the calculation.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">GPU recommendation matrix</div>
+        <div class="hint-text">Click any GPU row to show headroom in the breakdown panel above. Fit rating is based on average VRAM required.</div>
+        <div class="matrix-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>GPU</th>
+                <th>VRAM</th>
+                <th>Mem BW</th>
+                <th>MIG</th>
+                <th>NVLink</th>
+                <th>1×</th>
+                <th>2×</th>
+                <th>4×</th>
+                <th>6×</th>
+                <th>8×</th>
+                <th>16×</th>
+              </tr>
+            </thead>
+            <tbody id="gpu-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<footer>
+  <p>LLM-GPU Sizing Calculator &nbsp;·&nbsp; Estimates based on transformer KV cache arithmetic and published GPU specs.</p>
+  <p style="margin-top:4px;">Results are engineering approximations. Validate with actual serving framework profiling before finalizing hardware orders.</p>
+</footer>
+
+<script>
+const PRESETS = {
+  nemotron120: { layers:96,  kvheads:8, headdim:128, params:120,   label:'Nemotron-3-Super-120B-A12B' },
+  gptoss120:   { layers:96,  kvheads:8, headdim:128, params:120,   label:'gpt-oss-120b (MoE)' },
+  llama405:    { layers:126, kvheads:8, headdim:128, params:405,   label:'Llama 3.1 405B' },
+  llama370:    { layers:80,  kvheads:8, headdim:128, params:70,    label:'Llama 3.3 70B Instruct' },
+  qwen72:      { layers:80,  kvheads:8, headdim:128, params:72,    label:'Qwen2.5-Coder-72B Instruct' },
+  mixtral8x22: { layers:56,  kvheads:8, headdim:128, params:141,   label:'Mixtral 8×22B (MoE)' },
+  qwen32:      { layers:64,  kvheads:8, headdim:128, params:32,    label:'Qwen2.5-32B Instruct' },
+  llama32_90:  { layers:88,  kvheads:8, headdim:128, params:90,    label:'Llama 3.2 90B Vision' },
+  devstral24:  { layers:40,  kvheads:8, headdim:128, params:24,    label:'Devstral-Small-2-24B' },
+  mistral22:   { layers:56,  kvheads:8, headdim:128, params:22,    label:'Mistral-Small-22B' },
+  mixtral8x7b: { layers:32,  kvheads:8, headdim:128, params:46.7,  label:'Mixtral 8×7B (MoE)' },
+  llama8:      { layers:32,  kvheads:8, headdim:128, params:8,     label:'Llama 3.1 8B Instruct' },
+  qwen7:       { layers:28,  kvheads:4, headdim:128, params:7,     label:'Qwen2.5-7B Instruct' },
+  mistral7:    { layers:32,  kvheads:8, headdim:128, params:7,     label:'Mistral 7B v0.3' },
+};
+
+const GPUS = [
+  { name:'H200 SXM',                vram:141, bw:'4.8 TB/s',   mig:'Yes', nvlink:'Yes'     },
+  { name:'H200 NVL',                vram:141, bw:'4.8 TB/s',   mig:'Yes', nvlink:'Yes'     },
+  { name:'H100 SXM 80GB',           vram:80,  bw:'3.35 TB/s',  mig:'Yes', nvlink:'Yes'     },
+  { name:'H100 PCIe 80GB',          vram:80,  bw:'2.0 TB/s',   mig:'Yes', nvlink:'No'      },
+  { name:'A100 SXM 80GB',           vram:80,  bw:'2.0 TB/s',   mig:'Yes', nvlink:'Yes'     },
+  { name:'A100 PCIe 80GB',          vram:80,  bw:'1.94 TB/s',  mig:'Yes', nvlink:'No'      },
+  { name:'RTX PRO 6000 Blackwell',  vram:96,  bw:'1.7 TB/s',   mig:'Yes', nvlink:'Limited' },
+  { name:'RTX PRO 6000D Blackwell', vram:84,  bw:'1.5 TB/s',   mig:'Yes', nvlink:'Limited' },
+  { name:'RTX 6000 Ada',            vram:48,  bw:'960 GB/s',   mig:'No',  nvlink:'No'      },
+  { name:'L40S',                    vram:48,  bw:'864 GB/s',   mig:'No',  nvlink:'No'      },
+  { name:'L40',                     vram:48,  bw:'864 GB/s',   mig:'No',  nvlink:'No'      },
+  { name:'A40',                     vram:48,  bw:'696 GB/s',   mig:'No',  nvlink:'No'      },
+  { name:'RTX 4090',                vram:24,  bw:'1.0 TB/s',   mig:'No',  nvlink:'No'      },
+];
+
+function fitPill(required, available) {
+  const pct = required / available;
+  if (pct <= 0.75) return '<span class="pill pill-good">Comfortable</span>';
+  if (pct <= 0.92) return '<span class="pill pill-warn">Tight</span>';
+  return '<span class="pill pill-bad">Insufficient</span>';
+}
+
+function fmt(gb) { return Math.round(gb) + ' GB'; }
+
+function syncSlider(id, outId, fmtFn) {
+  const v = parseFloat(document.getElementById(id).value);
+  document.getElementById(outId).textContent = fmtFn(v);
+  calc();
+}
+
+function applyPreset() {
+  const key = document.getElementById('preset').value;
+  if (key === 'custom') return;
+  const p = PRESETS[key];
+  document.getElementById('layers').value  = p.layers;
+  document.getElementById('kvheads').value = p.kvheads;
+  document.getElementById('headdim').value = p.headdim;
+  document.getElementById('params').value  = p.params;
+  calc();
+}
+
+let selectedGpuIdx = null;
+
+function selectGpu(idx) {
+  selectedGpuIdx = idx;
+  document.querySelectorAll('#gpu-tbody tr').forEach((r, i) => {
+    r.classList.toggle('selected', i === idx);
+  });
+  updateHeadroom();
+}
+
+function updateHeadroom() {
+  if (selectedGpuIdx === null) return;
+  const gpu   = GPUS[selectedGpuIdx];
+  const avgGB = parseFloat(document.getElementById('out-avg').dataset.raw || 0);
+  const wcGB  = parseFloat(document.getElementById('out-wc').dataset.raw  || 0);
+
+  const configs = [1, 2, 4, 6, 8, 16];
+  let bestCount = 16;
+  for (const c of configs) {
+    if (avgGB / (gpu.vram * c) <= 0.92) { bestCount = c; break; }
+  }
+
+  const totalVram    = gpu.vram * bestCount;
+  const usedPct      = Math.min(100, Math.round(avgGB / totalVram * 100));
+  const headroomPct  = 100 - usedPct;
+  const wcUsedPct    = Math.min(100, Math.round(wcGB / totalVram * 100));
+
+  const countLabel   = bestCount + '×';
+  document.getElementById('hbar-label').textContent = gpu.name + ' — ' + countLabel + ' (' + totalVram + ' GB total)';
+
+  const pctEl = document.getElementById('hbar-pct');
+  pctEl.textContent = headroomPct + '% headroom';
+  pctEl.style.fontWeight = '600';
+  pctEl.style.color = headroomPct >= 25 ? 'var(--green)' : headroomPct >= 10 ? 'var(--amber)' : 'var(--red)';
+
+  const bar = document.getElementById('hbar');
+  bar.style.width = usedPct + '%';
+  bar.style.background = headroomPct >= 25 ? 'var(--green)' : headroomPct >= 10 ? 'var(--amber)' : 'var(--red)';
+
+  document.getElementById('hbar-note').textContent =
+    'Worst-case (' + fmt(wcGB) + ') uses ' + wcUsedPct + '% of available VRAM on ' + countLabel + ' ' + gpu.name;
+}
+
+function calc() {
+  const layers   = parseFloat(document.getElementById('layers').value)   || 0;
+  const kvheads  = parseFloat(document.getElementById('kvheads').value)  || 0;
+  const headdim  = parseFloat(document.getElementById('headdim').value)  || 0;
+  const params   = parseFloat(document.getElementById('params').value)   || 0;
+  const wprec    = parseFloat(document.getElementById('wprec').value);
+  const kprec    = parseFloat(document.getElementById('kprec').value);
+  const users    = parseInt(document.getElementById('users').value);
+  const ctx      = parseInt(document.getElementById('ctx').value);
+  const util     = parseFloat(document.getElementById('util').value) / 100;
+  const overhead = parseFloat(document.getElementById('overhead').value) || 0;
+
+  const weightGB        = (params * 1e9 * wprec) / 1e9;
+  const bytesPerToken   = 2 * layers * kvheads * headdim * kprec;
+  const mbPerToken      = bytesPerToken / 1e6;
+  const gbPerSessMax    = (bytesPerToken * ctx) / 1e9;
+  const gbPerSessAvg    = gbPerSessMax * util;
+  const kvAvg           = gbPerSessAvg * users;
+  const kvWC            = gbPerSessMax * users;
+  const totalAvg        = weightGB + kvAvg  + overhead;
+  const totalWC         = weightGB + kvWC   + overhead;
+
+  const avgEl = document.getElementById('out-avg');
+  avgEl.textContent    = fmt(totalAvg);
+  avgEl.dataset.raw    = totalAvg;
+  const wcEl = document.getElementById('out-wc');
+  wcEl.textContent     = fmt(totalWC);
+  wcEl.dataset.raw     = totalWC;
+
+  document.getElementById('b-weights').textContent = fmt(weightGB);
+  document.getElementById('b-kv').textContent      = fmt(kvAvg);
+  document.getElementById('b-kv-wc').textContent   = fmt(kvWC);
+  document.getElementById('b-oh').textContent      = fmt(overhead);
+  document.getElementById('b-total').textContent   = fmt(totalAvg);
+
+  const ctxK     = ctx >= 1024 ? Math.round(ctx / 1024) + 'K' : ctx;
+  const wpLabel  = wprec === 2 ? 'BF16' : wprec === 1 ? 'FP8' : 'INT4';
+  const kpLabel  = kprec === 2 ? 'FP16 (2B)' : kprec === 1 ? 'FP8 (1B)' : 'INT8 (0.5B)';
+
+  document.getElementById('math-box').innerHTML =
+    `<strong>Step 1 — KV cache bytes per token</strong>\n` +
+    `  = 2 × ${layers} layers × ${kvheads} KV heads × ${headdim} head_dim × ${kprec}B (${kpLabel})\n` +
+    `  = ${bytesPerToken.toLocaleString()} bytes = ${mbPerToken.toFixed(4)} MB per token\n\n` +
+    `<strong>Step 2 — KV cache per session</strong>\n` +
+    `  Max = ${mbPerToken.toFixed(4)} MB × ${ctx.toLocaleString()} tokens = <strong>${gbPerSessMax.toFixed(2)} GB</strong>\n` +
+    `  Avg (${Math.round(util*100)}% utilization) = ${gbPerSessMax.toFixed(2)} GB × ${Math.round(util*100)}% = <strong>${gbPerSessAvg.toFixed(2)} GB</strong>\n\n` +
+    `<strong>Step 3 — KV cache across ${users} concurrent users</strong>\n` +
+    `  Avg total  = ${gbPerSessAvg.toFixed(2)} GB × ${users} = <strong>${kvAvg.toFixed(2)} GB</strong>\n` +
+    `  Worst case = ${gbPerSessMax.toFixed(2)} GB × ${users} = <strong>${kvWC.toFixed(2)} GB</strong>\n\n` +
+    `<strong>Step 4 — Model weights (${wpLabel})</strong>\n` +
+    `  = ${params}B params × ${wprec}B per param = <strong>${weightGB.toFixed(2)} GB</strong>\n\n` +
+    `<strong>Step 5 — Total VRAM (avg)</strong>\n` +
+    `  = ${weightGB.toFixed(2)} (weights) + ${kvAvg.toFixed(2)} (KV cache) + ${overhead} (overhead)\n` +
+    `  = <strong>${totalAvg.toFixed(2)} GB</strong>`;
+
+  const tbody = document.getElementById('gpu-tbody');
+  tbody.innerHTML = '';
+  GPUS.forEach((g, idx) => {
+    const tr = document.createElement('tr');
+    if (idx === selectedGpuIdx) tr.classList.add('selected');
+    tr.onclick = () => selectGpu(idx);
+    tr.innerHTML =
+      `<td style="font-weight:500;">${g.name}</td>` +
+      `<td>${g.vram} GB</td>` +
+      `<td>${g.bw}</td>` +
+      `<td>${g.mig}</td>` +
+      `<td>${g.nvlink}</td>` +
+      `<td>${fitPill(totalAvg, g.vram * 1)}</td>` +
+      `<td>${fitPill(totalAvg, g.vram * 2)}</td>` +
+      `<td>${fitPill(totalAvg, g.vram * 4)}</td>` +
+      `<td>${fitPill(totalAvg, g.vram * 6)}</td>` +
+      `<td>${fitPill(totalAvg, g.vram * 8)}</td>` +
+      `<td>${fitPill(totalAvg, g.vram * 16)}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  if (selectedGpuIdx !== null) updateHeadroom();
+}
+
+calc();
+</script>
+</body>
+</html>
