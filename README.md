@@ -132,7 +132,7 @@ Fields for model presets:
 - **Estimates only.** Results are engineering approximations based on published architecture specs and standard KV cache arithmetic. Actual VRAM usage varies by serving framework, batch size, sampling parameters, and quantization implementation.
 - **Validate before ordering.** Always profile with your actual serving stack (vLLM, TensorRT-LLM, etc.) before finalizing hardware procurement.
 - **Multi-GPU assumes tensor parallelism.** The 2× and 4× GPU columns assume total VRAM is pooled via NVLink or equivalent. For GPUs without NVLink (e.g., L40S), multi-GPU serving requires pipeline parallelism, which has different efficiency characteristics.
-- **Activation memory not included.** Forward pass activation buffers are small relative to weights and KV cache for typical batch sizes, but may be material for very large batches.
+- **Activation memory not included.** Forward pass activation buffers are small relative to weights and KV cache for typical batch sizes, but may be non-negligible for very large batches.
 
 ---
 
